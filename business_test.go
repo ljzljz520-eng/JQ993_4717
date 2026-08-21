@@ -72,4 +72,29 @@ func TestBusiness27Regression(t *testing.T) {
 	if got.Status != domain.PendingReview {
 		t.Fatalf("expected confirmed retry state, got %s", got.Status)
 	}
+	// The returned state must match what the store actually retained for
+	// batch 993-27; the retry must never surface the stale Withdrawn snapshot.
+	persisted, err := s.GetRecord(r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != persisted.Status {
+		t.Fatalf("retry returned %s but store holds %s", got.Status, persisted.Status)
+	}
+	if got.Version != persisted.Version {
+		t.Fatalf("retry version %d but store holds %d", got.Version, persisted.Version)
+	}
+	// An immediate follow-up withdraw-and-retry must operate on the real
+	// confirmed PendingReview state, independently of the first attempt.
+	got2, err := v.RetryConfirmation(r.ID, "duty", "retry-27b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got2.Status != domain.PendingReview {
+		t.Fatalf("second retry expected confirmed state, got %s", got2.Status)
+	}
+	persisted2, _ := s.GetRecord(r.ID)
+	if got2.Version != persisted2.Version {
+		t.Fatalf("second retry version %d but store holds %d", got2.Version, persisted2.Version)
+	}
 }

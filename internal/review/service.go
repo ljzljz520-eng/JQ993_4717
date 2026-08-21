@@ -69,6 +69,15 @@ func (s *Service) audit(r domain.Record, action, actor, detail string) (domain.R
 	return r, nil
 }
 func (s *Service) History(id string) ([]domain.AuditEvent, error) { return s.store.ListAudits(id) }
+// RetryConfirmation performs a withdraw-and-retry cycle for a record: it
+// transitions the record through Withdrawn and back to PendingReview, then
+// returns the confirmed retry state that was persisted.
+//
+// The returned record must reflect the business result that was actually
+// saved, never the intermediate Withdrawn snapshot. Returning the stale
+// withdrawal would expose a state inconsistent with the store and let later
+// retries operate on the wrong status, so callers always see the confirmed,
+// independent PendingReview state for the batch.
 func (s *Service) RetryConfirmation(id, actor, token string) (domain.Record, error) {
 	r, err := s.store.GetRecord(id)
 	if err != nil {
@@ -89,31 +98,8 @@ func (s *Service) RetryConfirmation(id, actor, token string) (domain.Record, err
 	if err != nil {
 		return domain.Record{}, err
 	}
-	if err := s.store.SaveRecord(retry); err != nil {
-		return domain.Record{}, err
-	}
-	return withdrawal.Record, nil
-}
-func (s *Service) RetryConfirmationFixed(id, actor, token string) (domain.Record, error) {
-	r, err := s.store.GetRecord(id)
-	if err != nil {
-		return domain.Record{}, err
-	}
-	w, err := domain.PrepareWithdrawal(r, "retry", token)
-	if err != nil {
-		return domain.Record{}, err
-	}
-	if err := s.store.SaveRecord(w.Record); err != nil {
-		return domain.Record{}, err
-	}
-	retry, err := domain.ConfirmRetry(w)
-	if err != nil {
-		return domain.Record{}, err
-	}
-	retry, err = s.audit(retry, "retry_confirm", actor, "retried after withdrawal")
-	if err != nil {
-		return domain.Record{}, err
-	}
+	// Persist the confirmed retry state and return that same state so the
+	// caller sees exactly what the store retained for this batch.
 	if err := s.store.SaveRecord(retry); err != nil {
 		return domain.Record{}, err
 	}
