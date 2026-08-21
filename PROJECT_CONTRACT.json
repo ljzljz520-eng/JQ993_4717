@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "metrics": {
+    "production_loc": 2373,
+    "production_files": 37,
+    "production_packages": 9,
+    "test_files": 9,
+    "production_functions": 204,
+    "decision_points": 330
+  },
+  "persistence": {
+    "module": "go.etcd.io/bbolt",
+    "entities": [
+      "Record",
+      "AuditEvent",
+      "Workflow",
+      "Attachment"
+    ],
+    "reopen_test": "TestPersistenceSurvivesReopen"
+  },
+  "workflows": [
+    {
+      "steps": [
+        "create Record from product and batch metadata",
+        "assign and submit quality review",
+        "confirm approved review result",
+        "archive the confirmed record"
+      ],
+      "test": "TestWorkflowCreateReviewArchive"
+    },
+    {
+      "steps": [
+        "search records by query, status, owner or tag",
+        "select a matching Record",
+        "update notes, tags or attachments",
+        "publish by confirming the review"
+      ],
+      "test": "TestWorkflowSearchUpdatePublish"
+    },
+    {
+      "steps": [
+        "import CSV product rows",
+        "validate required fields and duplicate IDs",
+        "persist valid Record entities",
+        "report summary and audit history"
+      ],
+      "test": "TestWorkflowImportReport"
+    }
+  ]
+}
